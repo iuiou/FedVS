@@ -437,6 +437,7 @@ class UserBrokerImpl final : public UserBroker::Service {
                     }
                 }
             }
+            std::cout << std::endl;
             return;
         }
 
@@ -490,12 +491,12 @@ class UserBrokerImpl final : public UserBroker::Service {
             float radius = 0;
             while(r - l > eps) {
                 float mid = (r + l) / 2;
-                size_t Lnum = 0, Rnum = 0;
+                size_t Rnum = 0;
                 radius = 0;
                 for(size_t i = 0;i < siloNum;i++) {
                     if(eachBucketSet[i].empty()) continue;
                     size_t L = 0, R = (int)eachBucketSet[i].size() - 1;
-                    size_t ansPos = -1;
+                    int ansPos = -1;
                     while(L <= R) {
                         size_t Mid = (L + R) / 2;
                         if((eachBucketSet[i][Mid]->op == 1 && (eachBucketSet[i][Mid]->l <= mid && mid <= eachBucketSet[i][Mid]->r)) ||
@@ -508,8 +509,10 @@ class UserBrokerImpl final : public UserBroker::Service {
                             L = Mid + 1;
                         }
                     }
-                    Rnum += eachBucketSet[i][ansPos]->numR;
-                    radius = std::max(radius, eachBucketSet[i][ansPos]->r);
+                    if(ansPos != -1) {
+                        Rnum += eachBucketSet[i][ansPos]->numR;
+                        radius = std::max(radius, eachBucketSet[i][ansPos]->r);
+                    }
                 }
                 if(Rnum >= queryK) {
                     r = mid;
@@ -529,14 +532,15 @@ class UserBrokerImpl final : public UserBroker::Service {
                         continue;
                     }
                     size_t L = 0, R = eachBucketSet[i].size() - 1;
-                    size_t ansPos = -1;
+                    int ansPos = -1;
                     while(L <= R) {
                         size_t Mid = (L + R) / 2;
                         if((eachBucketSet[i][Mid]->op == 1 && (eachBucketSet[i][Mid]->l <= radius && radius <= eachBucketSet[i][Mid]->r)) ||
                         (eachBucketSet[i][Mid]->op == 2 && (eachBucketSet[i][Mid]->l < radius && radius < eachBucketSet[i][Mid]->r))) {
                             ansPos = Mid;
                             break;
-                        } else if(eachBucketSet[i][Mid]->l > radius) {
+                        } else if((eachBucketSet[i][Mid]->op == 1 && eachBucketSet[i][Mid]->l > radius) ||
+                        (eachBucketSet[i][Mid]->op == 2 && eachBucketSet[i][Mid]->l >= radius)) {
                             R = Mid - 1;
                         } else {
                             L = Mid + 1;
@@ -574,6 +578,7 @@ class UserBrokerImpl final : public UserBroker::Service {
             for(int i = 0;i < siloNum;i++) {
                 if(optBucketSet[i].empty()) ans[i] = 0;
                 else ans[i] = optBucketSet[i][posMp[i]]->r;
+                // ans[i] = radius;
             }
             return ans;
         }
@@ -601,6 +606,10 @@ class UserBrokerImpl final : public UserBroker::Service {
             // Sec 3.4 : Contribution Pre-estimation 
             std::vector<size_t> kSet;
             analyizeContribution(aes_key, aes_iv, queryV, queryK, condition, kSet);
+            for(size_t i = 0;i < kSet.size();i++) {
+                std::cout << kSet[i] << " ";
+            }
+            std::cout << std::endl;
             std::map<size_t, EncryptData> ciperMp; 
 
 

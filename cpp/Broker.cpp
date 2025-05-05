@@ -49,7 +49,7 @@ using brokersilo::Number;
 using userbroker::UserBroker;
 using userbroker::rpcComm;
 
-#define USE_TRUSTED_BROKER
+// #define USE_TRUSTED_BROKER
 // #define USE_INTEL_SGX
 
 #ifdef USE_INTEL_SGX

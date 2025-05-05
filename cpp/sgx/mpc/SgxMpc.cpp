@@ -286,7 +286,7 @@ void SgxImportInfo(size_t silo_id, int importType, size_t data_size,
 
     sgx_status_t status = ecall_ImportInformation(global_eid, &result_status, silo_id, importType, data_size, aes_key, aes_iv, encrypt_data);
     if (status != SGX_SUCCESS) {
-	    printf("ERROR: SGX IMPORT DATA FAIL, IMPORTTYPE = %d\n", &importType);
+	    printf("ERROR: SGX IMPORT DATA FAIL, IMPORTTYPE = %d\n", importType);
 	    print_error_message(status);
 	    exit(-1);
     }
@@ -307,7 +307,7 @@ void SgxGetPrunedK(size_t silo_id, size_t max_output_size,
     
     sgx_status_t status = ecall_GetPrunedK(global_eid, &result_status, silo_id, max_output_size, aes_key, aes_iv, encrypt_k);
     if (status != SGX_SUCCESS) {
-	    printf("ERROR: SGX GET PRUNED K FROM %d FAIL", &silo_id);
+	    printf("ERROR: SGX GET PRUNED K FROM %d FAIL", (int)silo_id);
 	    print_error_message(status);
 	    exit(-1);
     }
@@ -323,14 +323,14 @@ void SgxGetThres(size_t silo_id, size_t max_output_size,
     int result_status = 0xff;
     sgx_status_t status = ecall_GetThres(global_eid, &result_status, silo_id, max_output_size, aes_key, aes_iv, encrypt_thres);
     if (status != SGX_SUCCESS) {
-	    printf("ERROR: SGX GET THRESHOLD FROM %d FAIL", &silo_id);
+	    printf("ERROR: SGX GET THRESHOLD FROM %d FAIL", (int)silo_id);
 	    print_error_message(status);
 	    exit(-1);
     }
 }
 
 void SgxTopkSelection(size_t silo_num, size_t k) {
-    ecall_TopkSelection(silo_num, k);
+    ecall_TopkSelection(global_eid, silo_num, k);
 }
 
 int SgxGetK(size_t silo_id) {

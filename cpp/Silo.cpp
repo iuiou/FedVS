@@ -42,6 +42,12 @@ using brokersilo::Number;
 
 #define recordIndexBuilding
 
+std::string MilvusPort = "19530";
+bool buildClusterOption = false;
+bool buildMilvusOption = false;
+float alpha = 0.05;
+int clusterNumber = 10;
+
 size_t avgK = 0;
 size_t minK = 1e9;
 
@@ -69,7 +75,7 @@ class BrokerSiloImpl final : public BrokerSilo::Service {
         m_logger.Init();
         siloPtr = std::make_unique<MilvusSiloConnector<Distance>>(siloId, ipAddr, collectionName);
         siloPtr->ImportScalarData(scalarName);
-        siloPtr->ConnectDB("fzh", "fzh", "123", "localhost", "19530"); // only the last two attributes make sense
+        siloPtr->ConnectDB("fzh", "fzh", "123", "localhost", MilvusPort); // only the last two attributes make sense
         if(buildMilvusOption) {
             siloPtr->ImportData(dataName);
             siloPtr->ConstructIndex(indexType);
@@ -81,10 +87,9 @@ class BrokerSiloImpl final : public BrokerSilo::Service {
         if(buildClusterOption) {
             if(!buildMilvusOption) siloPtr->ImportData(dataName);
             const int iteration = 10;
-            int clusterNum = 100;
             m_logger.SetStartTimer();
             std::cout << "start k means" << std::endl;
-            std::unique_ptr<AvgKmeans> KmeansOperator = std::make_unique<AvgKmeans>(siloPtr->getVectorData(), clusterNum, iteration);
+            std::unique_ptr<AvgKmeans> KmeansOperator = std::make_unique<AvgKmeans>(siloPtr->getVectorData(), clusterNumber, iteration);
             std::cout << "end k means" << std::endl;
             KmeansOperator->dumpToFile(clusterName);
             KmeansOperator->dumpClusterToFile(clusterAddName);
@@ -662,8 +667,13 @@ int main(int argc, char** argv){
             ("data-path", bpo::value<std::string>(), "Data file path")
             ("scalardata-path", bpo::value<std::string>(), "scalar data file path")
             ("cluster-path", bpo::value<std::string>(), "cluster file path")
+            ("milvus-port", bpo::value<std::string>(), "running port of Milvus")
             ("collection-name", bpo::value<std::string>(), "milvus collection's name")
             ("index-type", bpo::value<std::string>(), "Index's type of local vector database")
+            ("cluster-option", bpo::value<std::string>(), "whether build clusters")
+            ("milvus-option", bpo::value<std::string>(), "whether import data")
+            ("alpha", bpo::value<float>(&alpha)->default_value(0.05), "our CLI's hyper-parameter $\\alpha$")
+            ("cluster-num", bpo::value<int>(&clusterNumber)->default_value(10), "our CLI's hyper-parameter: number of clusters")
         ;
 
         bpo::variables_map variable_map;
@@ -726,6 +736,35 @@ int main(int argc, char** argv){
             std::cout << "Data silo's index type was not set" << "\n";
             options_all_set = false;
         }
+
+        if (variable_map.count("milvus-port")) {
+            MilvusPort = variable_map["milvus-port"].as<std::string>();
+            std::cout << "Local Milvus's port was set as " << MilvusPort << "\n";
+        } else {
+            std::cout << "Local Milvus's port was not set " << "\n";
+            options_all_set = false;
+        }
+
+        if (variable_map.count("cluster-option")) {
+            std::string buildCluster = variable_map["cluster-option"].as<std::string>();
+            std::cout << "Build Cluster Option was set as " << buildCluster << "\n";
+            buildClusterOption = (buildCluster == "ON" ? true : false);
+        } else {
+            std::cout << "Build Cluster Option was not set " << "\n";
+            options_all_set = false;
+        }
+
+        if (variable_map.count("milvus-option")) {
+            std::string buildMilvus = variable_map["milvus-option"].as<std::string>();
+            std::cout << "Build Milvus Option was set as " << buildMilvus << "\n";
+            buildMilvusOption = (buildMilvus == "ON" ? true : false);
+        } else {
+            std::cout << "Build Milvus Option was not set " << "\n";
+            options_all_set = false;
+        }
+
+        std::cout << "hyper parameter alpha was set as " << alpha << "\n"; 
+        std::cout << "cluster's number was set as " << clusterNumber << "\n"; 
 
         if (false == options_all_set) {
             throw std::invalid_argument("Some options were not properly set");

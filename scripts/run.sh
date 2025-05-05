@@ -1,0 +1,1 @@
+../cpp/build/user  --broker-ip=localhost:50056 --silo-ip=ip.txt --query-k=128 --query-path=/home/dataset/hybrid/YouTube-audio/query.txt --output-path=output.txt --truth-path=/home/dataset/hybrid/YouTube-audio/gt_128_5.ivecs

@@ -235,6 +235,7 @@ else()
         ${_GRPC_GRPCPP}
         ${_PROTOBUF_LIBPROTOBUF})
     target_link_libraries(${_target} PRIVATE Boost::program_options Boost::system)
+endif()
 
 set(_target "user")
 message(STATUS "Compiling executable ${_target}")

@@ -1,9 +1,14 @@
 #!/bin/bash
 silo_id=0
 number=$((0*5 + ${silo_id}))
-data_path="/home/dataset/testHybrid/YouTube-audio/YouTube_${number}.fivecs"
-scalardata_path="/home/dataset/testHybrid/YouTube-audio/meta_${number}.txt"
-cluster_path="/home/dataset/testHybrid/YouTube-audio/YouTube_${number}.cluster/cluster"
+data_path="/home/dataset/hybrid/YouTube-audio/YouTube_${number}.fivecs"
+scalardata_path="/home/dataset/hybrid/YouTube-audio/meta_${number}.txt"
+cluster_path="/home/dataset/hybrid/YouTube-audio/YouTube_${number}.cluster/cluster"
 collection_name="LOCAL_DATA_${number}"
-
-../cpp/build/silo --ip=localhost:50050 --id=$number --data-path=$data_path --scalardata-path=$scalardata_path --cluster-path=$cluster_path --index-type=HNSW --collection-name=$collection_name
+milvus_port="50055"
+cluster_option="ON"
+milvus_option="ON"
+alpha=0.05
+cluster_num=10
+ 
+../cpp/build/silo --ip=localhost:50050 --id=$number --data-path=$data_path --scalardata-path=$scalardata_path --cluster-path=$cluster_path --index-type=HNSW --collection-name=$collection_name --milvus-port=$milvus_port --cluster-option=$cluster_option --milvus-option=$milvus_option --alpha=$alpha --cluster-num=$cluster_num

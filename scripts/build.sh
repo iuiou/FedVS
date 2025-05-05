@@ -11,5 +11,5 @@ fi
 mkdir -p ../cpp/build
 cp -r ../refs ../cpp/build
 cd ../cpp/build/
-cmake ../ -DUSE_SGX=OFF
-make -j 4
+cmake ../ -DUSE_SGX=ON
+make -j 1

@@ -258,7 +258,7 @@ struct Array {
     int ptr;
     int silo_id;
     struct QueueItem* a;
-}
+};
 
 static struct OblivQueue* obliv_queue = NULL;
 
@@ -598,7 +598,7 @@ int ecall_ImportInformation(size_t silo_id, int importType, size_t data_size,
             float dis = UnsignedVectorToFloat(plain_data, offset + batchSize * i);
             array[silo_id]->a[i].dist = dis;
             array[silo_id]->a[i].vid = 0;
-            array[silo_id]->a[i].silo_id = silod_id;
+            array[silo_id]->a[i].silo_id = silo_id;
         }
     } else if(importType == 2) { // phase I: candidates refinement
         int batchSize = sizeof(float), offset = 0;
@@ -613,7 +613,7 @@ int ecall_ImportInformation(size_t silo_id, int importType, size_t data_size,
         for(int i = 0;i < num; i++, offset += batchSize) {
             float dis = UnsignedVectorToFloat(plain_data, offset);
             array[silo_id]->a[i].dist = dis;
-            array[silo_id]->a[i].vid = (j == num - 1 ? k - bucketSize * j : bucketSize);
+            array[silo_id]->a[i].vid = (i == num - 1 ? k - bucketSize * i : bucketSize);
             array[silo_id]->a[i].silo_id = silo_id;
         }
     } else { // phase II: secure top-k selection
@@ -667,23 +667,23 @@ void ecall_CandRefinement(size_t silo_num, size_t k) {
     for(int i = 0;i < silo_num;i++) {
         array[i]->ptr = 0;
         if (array[i]->size > 0) { 
-            OblivEnqueue(q, array[i]->a[0].dist, array[i]->a[0].vid, array[i]->a[0].silo_id);
+            OblivEnqueue(obliv_queue, array[i]->a[0].dist, array[i]->a[0].vid, array[i]->a[0].silo_id);
             array[i]->ptr++;
         }
     }
     int cnt = 0;
     float radius = 0;
-    while(cnt < k && q->ptr > 0) {
+    while(cnt < k && obliv_queue->ptr > 0) {
         float dist;
         int count, silo_id;
-        OblivQueueHead(q, dist, count, silo_id);
-        OblivDequeue(q);
+        OblivQueueHead(obliv_queue, &dist, &count, &silo_id);
+        OblivDequeue(obliv_queue);
         cnt += count;
         radius = (radius < dist) ? dist : radius;
         if(cnt >= k) break;
         if(array[silo_id]->ptr < array[silo_id]->size) {
             int pt = array[silo_id]->ptr;
-            OblivEnqueue(q, array[silo_id]->a[pt].dist, array[silo_id]->a[pt].vid, array[silo_id]->a[pt].silo_id);
+            OblivEnqueue(obliv_queue, array[silo_id]->a[pt].dist, array[silo_id]->a[pt].vid, array[silo_id]->a[pt].silo_id);
             array[silo_id]->ptr++;
         }
     }
@@ -691,6 +691,7 @@ void ecall_CandRefinement(size_t silo_num, size_t k) {
         int pt = array[i]->ptr;
         thres[i] = array[i]->a[pt - 1].dist;
     }
+    OblivFreeQueue(obliv_queue);
 }
 
 int ecall_GetThres(size_t silo_id, size_t max_output_size,
@@ -708,28 +709,29 @@ int ecall_GetThres(size_t silo_id, size_t max_output_size,
 static int finalK[10] = {0};
 
 void ecall_TopkSelection(size_t silo_num, size_t k) {
-    OblivInitQueue(obliv_queue, silo_num);
+    OblivCreateQueue(obliv_queue, silo_num);
     for(int i = 0;i < silo_num; i++) {
         array[i]->ptr = 0;
         if (array[i]->size > 0) { 
-            OblivEnqueue(q, array[i]->a[0].dist, array[i]->a[0].vid, array[i]->a[0].silo_id);
+            OblivEnqueue(obliv_queue, array[i]->a[0].dist, array[i]->a[0].vid, array[i]->a[0].silo_id);
             array[i]->ptr++;
         }
     }
     int cnt = 0;
-    while(cnt < k && q->ptr > 0) {
+    while(cnt < k && obliv_queue->ptr > 0) {
         float dist;
         int count, silo_id;
-        OblivQueueHead(q, dist, count, silo_id);
-        OblivDequeue(q);
+        OblivQueueHead(obliv_queue, &dist, &count, &silo_id);
+        OblivDequeue(obliv_queue);
         cnt += 1;
         finalK[silo_id]++;
         if(array[silo_id]->ptr < array[silo_id]->size) {
             int pt = array[silo_id]->ptr;
-            OblivEnqueue(q, array[silo_id]->a[pt].dist, array[silo_id]->a[pt].vid, array[silo_id]->a[pt].silo_id);
+            OblivEnqueue(obliv_queue, array[silo_id]->a[pt].dist, array[silo_id]->a[pt].vid, array[silo_id]->a[pt].silo_id);
             array[silo_id]->ptr++;
         }
     }
+    OblivFreeQueue(obliv_queue);
 }
 
 int ecall_GetK(size_t silo_id) {

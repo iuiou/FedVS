@@ -262,7 +262,17 @@ class UserBrokerImpl final : public UserBroker::Service {
                                 grpc::InsecureChannelCredentials(), args), i, url);
             }
             m_logger.Init();
+
+            #ifdef USE_INTEL_SGX
+            SgxInitEnclave();
+            #endif
         }   
+
+        #ifdef USE_INTEL_SGX
+        ~UserBrokerImpl() {
+            SgxFreeEnclave();
+        }
+        #endif
 
         static void exchangeParamsThread(UserBrokerImpl *impl, const size_t siloId) {
             std::lock_guard<std::mutex> lock(impl->dataMutex);
@@ -367,7 +377,7 @@ class UserBrokerImpl final : public UserBroker::Service {
             for(size_t i = 0;i < siloNum;i++) {
                 SgxClearInfo(i);
                 std::vector<unsigned char> dat = StringToUnsignedVector(databack[i].data());
-                SgxImportInfo(silo_id, 1, dat.size(), aes_key[i], aes_iv[i], dat.data());
+                SgxImportInfo(i, 1, dat.size(), aes_key[i].data(), aes_iv[i].data(), dat.data());
             }
             SgxJointEstimation(siloNum, queryK);
             ans.resize(siloNum);
@@ -628,10 +638,10 @@ class UserBrokerImpl final : public UserBroker::Service {
             #ifdef USE_INTEL_SGX
             for(size_t i = 0;i < siloNum;i++) {
                 unsigned char* CiperPrunedK = NULL;
-                SgxGetPrunedK(i, 16, aes_key[i], aes_iv[i], CiperPrunedK);
+                SgxGetPrunedK(i, 16, aes_key[i].data(), aes_iv[i].data(), CiperPrunedK);
                 std::vector<unsigned char> ciperText(CiperPrunedK, CiperPrunedK + 16);
                 EncryptData data;
-                data.set_data(std::string(CiperPrunedK.begin(), CiperPrunedK.end()));
+                data.set_data(std::string(ciperText.begin(), ciperText.end()));
                 ciperMp[i] = data; 
             }
             #endif
@@ -661,8 +671,8 @@ class UserBrokerImpl final : public UserBroker::Service {
 
             #ifdef USE_INTEL_SGX
             databack.clear();
-            ciperMp[i].clear();
             parallelGetInterval(ciperMp);
+            ciperMp.clear();
             if(topKOption == 1) {
                 for(size_t i = 0;i < siloNum;i++) {
                     std::vector<unsigned char> plainText = FloatToUnsignedVector(FLOAT_INF);
@@ -672,21 +682,19 @@ class UserBrokerImpl final : public UserBroker::Service {
                     data.set_data(std::string(ciperText.begin(), ciperText.end()));
                     ciperMp[i] = data; 
                 }
-            } else if(topKOption == 2) { // TODO
-                
             } else {
                 for(size_t i = 0;i < siloNum;i++) {
                     SgxClearInfo(i);
                     std::vector<unsigned char> dat = StringToUnsignedVector(databack[i].data());
-                    SgxImportInfo(silo_id, 2, dat.size(), aes_key[i], aes_iv[i], dat.data());
+                    SgxImportInfo(i, 2, dat.size(), aes_key[i].data(), aes_iv[i].data(), dat.data());
                 }
                 SgxCandRefinement(siloNum, queryK);
                 for(size_t i = 0;i < siloNum;i++) {
                     unsigned char* CiperThres = NULL;
-                    SgxGetThres(i, 16, aes_key[i], aes_iv[i], CiperThres);
+                    SgxGetThres(i, 16, aes_key[i].data(), aes_iv[i].data(), CiperThres);
                     std::vector<unsigned char> ciperText(CiperThres, CiperThres + 16);
                     EncryptData data;
-                    data.set_data(std::string(CiperThres.begin(), CiperThres.end()));
+                    data.set_data(std::string(ciperText.begin(), ciperText.end()));
                     ciperMp[i] = data; 
                 }
             }
@@ -696,6 +704,7 @@ class UserBrokerImpl final : public UserBroker::Service {
             databack.clear();
             parallelGetDisInf(ciperMp);
 
+            std::map<size_t, int> numMp;
             #ifdef USE_TRUSTED_BROKER
             std::priority_queue<std::pair<float, size_t>, std::vector<std::pair<float, size_t>>, std::greater<std::pair<float, size_t>>> q;
             std::vector<std::vector<float>> disSet;
@@ -709,7 +718,7 @@ class UserBrokerImpl final : public UserBroker::Service {
                     disSet[i].emplace_back(dis); 
                 }
             }
-            std::map<size_t, int> posMp, numMp;
+            std::map<size_t, int> posMp;
             for(int i = 0;i < siloNum;i++) {
                 posMp[i] = numMp[i] = 0;
                 if(posMp[i] < disSet[i].size()) {
@@ -735,7 +744,7 @@ class UserBrokerImpl final : public UserBroker::Service {
             for(size_t i = 0;i < siloNum;i++) {
                 SgxClearInfo(i);
                 std::vector<unsigned char> dat = StringToUnsignedVector(databack[i].data());
-                SgxImportInfo(silo_id, 3, dat.size(), aes_key[i], aes_iv[i], dat.data());
+                SgxImportInfo(i, 3, dat.size(), aes_key[i].data(), aes_iv[i].data(), dat.data());
             }
             SgxTopkSelection(siloNum, queryK);
             for(size_t i = 0;i < siloNum;i++) {

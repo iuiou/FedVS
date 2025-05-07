@@ -50,7 +50,7 @@ void SgxOblivDequeue(void);
 
 void SgxOblivDequeue(int num);
 
-void SgxImportInfo(size_t silo_id, int importType, size_t data_size,
+void SgxImportInfo(size_t silo_id, int importType, size_t data_size, size_t query_k,
                 const uint8_t *aes_key, const uint8_t* aes_iv,
                 const unsigned char* encrypt_data);
 
@@ -58,15 +58,13 @@ void SgxClearInfo(size_t silo_id);
 
 void SgxJointEstimation(size_t silo_num, size_t k);
 
-void SgxGetPrunedK(size_t silo_id, size_t max_output_size, 
-                   const uint8_t* aes_key, const uint8_t* aes_iv,
-                   unsigned char* encrypt_k);
+std::vector<unsigned char> SgxGetPrunedK(size_t silo_id, size_t max_output_size, 
+                   const uint8_t* aes_key, const uint8_t* aes_iv);
 
 void SgxCandRefinement(size_t silo_num, size_t k);
 
-void SgxGetThres(size_t silo_id, size_t max_output_size,
-                    const uint8_t* aes_key, const uint8_t* aes_iv,
-                    unsigned char* encrypt_thres);
+std::vector<unsigned char> SgxGetThres(size_t silo_id, size_t max_output_size,
+                    const uint8_t* aes_key, const uint8_t* aes_iv);
 
 void SgxTopkSelection(size_t silo_num, size_t k);
 

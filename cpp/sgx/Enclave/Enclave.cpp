@@ -77,24 +77,23 @@ static int32_t UnsignedVectorToInt32(const unsigned char* arr, size_t offset) {
     return result;
 }
 
-static void Int32ToUnsignedChar(unsigned char* result, int ori) {
-    if(result == NULL) {
-        result = (unsigned char*) malloc (16 * sizeof(unsigned char));
-    }
-    memcpy(result, &ori, sizeof(int32_t));
+static unsigned char* Int32ToUnsignedChar(int ori) {
+    unsigned char* result = (unsigned char*) malloc(16 * sizeof(unsigned char));
+    memcpy(result, &ori, sizeof(ori));
+    // local_printf("%02x\n", result[0]);
     for(int j = 4; j < 16; j++) {
         result[j] = '\0';
     }
+    return result;
 }
 
-static void FloatToUnsignedChar(unsigned char* result, float ori) {
-    if(result == NULL) {
-        result = (unsigned char*) malloc (16 * sizeof(unsigned char));
-    }
-    memcpy(result, &ori, sizeof(float));
+static unsigned char* FloatToUnsignedChar(float ori) {
+    unsigned char* result = (unsigned char*) malloc(16 * sizeof(unsigned char));
+    memcpy(result, &ori, sizeof(ori));
     for(int j = 4;j < 16; j++) {
         result[j] = '\0';
     }
+    return result;
 } 
 
 static int mbedtls_decrypt_data(const uint8_t *aes_key, const uint8_t* aes_iv,
@@ -202,6 +201,10 @@ static int mbedtls_encrypt_data(const uint8_t *aes_key, const uint8_t* aes_iv,
         return -1;
     }
 
+    #ifdef LOCAL_SGX_DEBUG
+    local_printf("[FINISH] set encryption key\n");
+    #endif
+
     // 分配加密数据缓冲区
     encrypt_key = (unsigned char *)calloc(plain_key_size, sizeof(unsigned char));
     if (encrypt_key == NULL) {
@@ -211,6 +214,10 @@ static int mbedtls_encrypt_data(const uint8_t *aes_key, const uint8_t* aes_iv,
         mbedtls_aes_free(&aes_context);
         return -1;
     }
+
+    #ifdef LOCAL_SGX_DEBUG
+    local_printf("[FINISH] allocate memory for encrypt_key\n");
+    #endif
 
     // 执行CBC模式加密（注意改为ENCRYPT模式）
     ret_status = mbedtls_aes_crypt_cbc(&aes_context, MBEDTLS_AES_ENCRYPT,
@@ -224,6 +231,10 @@ static int mbedtls_encrypt_data(const uint8_t *aes_key, const uint8_t* aes_iv,
         mbedtls_aes_free(&aes_context);
         return -1;
     }
+
+    #ifdef LOCAL_SGX_DEBUG
+    local_printf("[FINISH] encrypt data\n");
+    #endif
 
     mbedtls_aes_free(&aes_context);
     return 0;
@@ -579,7 +590,7 @@ static int ceilSqrtK(int k) {
     return i;
 }
 
-int ecall_ImportInformation(size_t silo_id, int importType, size_t data_size,
+int ecall_ImportInformation(size_t silo_id, int importType, size_t data_size, size_t query_k,
                     const uint8_t *aes_key, const uint8_t* aes_iv,
                     const unsigned char* encrypt_data) {
     int ret_status = 0;
@@ -603,8 +614,13 @@ int ecall_ImportInformation(size_t silo_id, int importType, size_t data_size,
     } else if(importType == 2) { // phase I: candidates refinement
         int batchSize = sizeof(float), offset = 0;
         int k = UnsignedVectorToInt32(plain_data, offset);
-        int bucketSize = ceilSqrtK(k);
+        int bucketSize = ceilSqrtK(query_k);
         int num = (k + bucketSize - 1) / bucketSize;
+
+        #ifdef LOCAL_SGX_DEBUG
+        local_printf("[IN SGX] silo_id : %d, bucketSize : %d, num : %d\n", silo_id, bucketSize, num);
+        #endif
+
         InitArray(silo_id, num);
         offset += sizeof(int);
         array[silo_id]->silo_id = silo_id;
@@ -635,7 +651,7 @@ int ecall_ImportInformation(size_t silo_id, int importType, size_t data_size,
     return ret_status;
 }
 
-static size_t pruned_k[10] = {0};
+static int pruned_k[10] = {0};
 
 void ecall_JointEstimation(size_t silo_num, size_t k) {
     int ret_status = 0;
@@ -644,7 +660,12 @@ void ecall_JointEstimation(size_t silo_num, size_t k) {
         MinRadius = (MinRadius > array[i]->a[0].dist) ? array[i]->a[0].dist : MinRadius;
     }
     for(int i = 0;i < silo_num; i++) {
-        pruned_k[i] = k * (MinRadius / array[i]->a[0].dist);
+        pruned_k[i] = ceil(1.0 * k * (MinRadius / array[i]->a[0].dist));
+        pruned_k[i] = (pruned_k[i] >= 1 ? pruned_k[i] : 1);
+
+        #ifdef LOCAL_SGX_DEBUG
+        local_printf("[Joint Estimation Results] siloid: %d, k: %d\n", i, pruned_k[i]);
+        #endif
     }
 }
 
@@ -652,11 +673,14 @@ int ecall_GetPrunedK(size_t silo_id, size_t max_output_size,
                     const uint8_t* aes_key, const uint8_t* aes_iv,
                     unsigned char* encrypt_k) {
     int ret_status = 0;
-    encrypt_k = NULL;
-    unsigned char* plain_data = NULL;
-    Int32ToUnsignedChar(plain_data, pruned_k[silo_id]);
-    ret_status = mbedtls_encrypt_data(aes_key, aes_iv, plain_data, max_output_size, encrypt_k);    
+    unsigned char* encrypt_key = NULL;
+    unsigned char* plain_data = Int32ToUnsignedChar(pruned_k[silo_id]);
+    ret_status = mbedtls_encrypt_data(aes_key, aes_iv, plain_data, max_output_size, encrypt_key);
+    for(int i = 0;i < max_output_size;i++) {
+        encrypt_k[i] = encrypt_key[i];
+    }
     free(plain_data);
+    free(encrypt_key);
     return ret_status;
 }
 
@@ -691,6 +715,15 @@ void ecall_CandRefinement(size_t silo_num, size_t k) {
         int pt = array[i]->ptr;
         thres[i] = array[i]->a[pt - 1].dist;
     }
+
+    #ifdef LOCAL_SGX_DEBUG
+    local_printf("[Candidate Refinement Results]: ");
+    for(int i = 0;i < silo_num; i++) {
+        local_printf("%f ", thres[i]);
+    }
+    local_printf("\n");
+    #endif
+
     OblivFreeQueue(obliv_queue);
 }
 
@@ -698,11 +731,14 @@ int ecall_GetThres(size_t silo_id, size_t max_output_size,
                   const uint8_t* aes_key, const uint8_t* aes_iv,
                   unsigned char* encrypt_thres) {
     int ret_status = 0;
-    encrypt_thres = NULL;
-    unsigned char* plain_data = NULL;
-    FloatToUnsignedChar(plain_data, thres[silo_id]);
-    ret_status = mbedtls_encrypt_data(aes_key, aes_iv, plain_data, max_output_size, encrypt_thres);    
+    unsigned char* encrypt_key = NULL;
+    unsigned char* plain_data = FloatToUnsignedChar(thres[silo_id]);
+    ret_status = mbedtls_encrypt_data(aes_key, aes_iv, plain_data, max_output_size, encrypt_key);   
+    for(int i = 0;i < max_output_size;i++) {
+        encrypt_thres[i] = encrypt_key[i];
+    } 
     free(plain_data);
+    free(encrypt_key);
     return ret_status;
 }
 
@@ -732,8 +768,18 @@ void ecall_TopkSelection(size_t silo_num, size_t k) {
         }
     }
     OblivFreeQueue(obliv_queue);
+
+    #ifdef LOCAL_SGX_DEBUG 
+    local_printf("[Top-k Selection Results]: ");
+    for(int i = 0;i < silo_num;i++) {
+        local_printf("%d ", finalK[i]);
+    }
+    local_printf("\n");
+    #endif
 }
 
 int ecall_GetK(size_t silo_id) {
-    return finalK[silo_id];
+    int ans = finalK[silo_id];
+    finalK[silo_id] = 0;
+    return ans;
 }

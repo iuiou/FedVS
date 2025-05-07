@@ -36,7 +36,7 @@ enclave {
         /* information from one silo per time */
         public void ecall_ClearInformation(size_t silo_id);
 
-        public int ecall_ImportInformation(size_t silo_id, int importType, size_t data_size,
+        public int ecall_ImportInformation(size_t silo_id, int importType, size_t data_size, size_t query_k,
                                           [in, count=16] const uint8_t* aes_key, [in, count=16] const uint8_t* aes_iv,
                                           [in, count=data_size] const unsigned char* encrypt_data);
 

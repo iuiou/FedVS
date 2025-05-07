@@ -224,6 +224,7 @@ if(USE_SGX STREQUAL "ON")
     target_link_libraries(${_target} Boost::program_options Boost::system)
 else()
     add_executable(${_target} "./Broker.cpp")
+    target_compile_definitions(${_target} PRIVATE USE_TRUSTED_BROKER)
     target_link_libraries(${_target} PRIVATE
         # asan
         milvus_sdk

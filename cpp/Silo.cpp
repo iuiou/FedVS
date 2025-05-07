@@ -319,7 +319,7 @@ class BrokerSiloImpl final : public BrokerSilo::Service {
                 disIntervals.emplace_back(nowCluster);
             }
         }
-        std::cout << "clusters' number is " << disIntervals.size() << std::endl;
+        // std::cout << "Filtered clusters' number is " << disIntervals.size() << std::endl;
         float sel = 1.0 * count / sum;
         if(sel == 0) {
             return FLOAT_INF;
@@ -474,8 +474,11 @@ class BrokerSiloImpl final : public BrokerSilo::Service {
         AES aes(AESKeyLength::AES_128);
         std::vector<unsigned char> plainText = aes.DecryptCBC(StringToUnsignedVector(kCiperText), aes_key, aes_iv);
         size_t newK = (size_t)UnsignedVectorToInt32(std::vector<unsigned char>(plainText.begin(), plainText.begin() + 4));
+        // std::cout << "pruned k : " << newK << std::endl;
         exactKNN(newK);
         newK = std::min(newK, candidates.size());
+
+        // std::cout << "after vector search k : " << newK << std::endl;
 
         avgK += newK;
         minK = std::min(minK, newK); // ablation study for optimization #2
@@ -510,6 +513,9 @@ class BrokerSiloImpl final : public BrokerSilo::Service {
                 ptr += blockS;
             }
             int num = (newK + blockS - 1) / blockS;
+
+            // printf("[OUT OF SGX] silo_id : %d, bucketSize : %d, num : %d\n", siloPtr->GetSiloId(), blockS, num);
+
             if(border.size() < num) border.emplace_back(candidates.back().first);
             plainText.clear(); 
             std::vector<unsigned char> kPlain = Int32ToUnsignedVector((int)newK);
@@ -547,6 +553,7 @@ class BrokerSiloImpl final : public BrokerSilo::Service {
         }
         std::vector<unsigned char> plainText = aes.DecryptCBC(StringToUnsignedVector(rCiperText), aes_key, aes_iv);
         float range = UnsignedVectorToFloat(std::vector<unsigned char>(plainText.begin(), plainText.begin() + 4));
+        // std::cout << "pruned range : " << range << std::endl;
         if(range <= 0) {
             range = FLOAT_INF;
         } 

@@ -377,7 +377,7 @@ class UserBrokerImpl final : public UserBroker::Service {
             for(size_t i = 0;i < siloNum;i++) {
                 SgxClearInfo(i);
                 std::vector<unsigned char> dat = StringToUnsignedVector(databack[i].data());
-                SgxImportInfo(i, 1, dat.size(), aes_key[i].data(), aes_iv[i].data(), dat.data());
+                SgxImportInfo(i, 1, dat.size(), queryK, aes_key[i].data(), aes_iv[i].data(), dat.data());
             }
             SgxJointEstimation(siloNum, queryK);
             ans.resize(siloNum);
@@ -616,14 +616,14 @@ class UserBrokerImpl final : public UserBroker::Service {
             // Sec 3.4 : Contribution Pre-estimation 
             std::vector<size_t> kSet;
             analyizeContribution(aes_key, aes_iv, queryV, queryK, condition, kSet);
-            for(size_t i = 0;i < kSet.size();i++) {
-                std::cout << kSet[i] << " ";
-            }
-            std::cout << std::endl;
             std::map<size_t, EncryptData> ciperMp; 
 
 
             #ifdef USE_TRUSTED_BROKER
+            for(size_t i = 0;i < kSet.size();i++) {
+                std::cout << kSet[i] << " ";
+            }
+            std::cout << std::endl;
             for(size_t i = 0;i < siloNum;i++) {
                 size_t prunedK = kSet[i];
                 std::vector<unsigned char> plainText = Int32ToUnsignedVector((int)prunedK);
@@ -637,9 +637,7 @@ class UserBrokerImpl final : public UserBroker::Service {
 
             #ifdef USE_INTEL_SGX
             for(size_t i = 0;i < siloNum;i++) {
-                unsigned char* CiperPrunedK = NULL;
-                SgxGetPrunedK(i, 16, aes_key[i].data(), aes_iv[i].data(), CiperPrunedK);
-                std::vector<unsigned char> ciperText(CiperPrunedK, CiperPrunedK + 16);
+                std::vector<unsigned char> ciperText = SgxGetPrunedK(i, 16, aes_key[i].data(), aes_iv[i].data());
                 EncryptData data;
                 data.set_data(std::string(ciperText.begin(), ciperText.end()));
                 ciperMp[i] = data; 
@@ -657,7 +655,12 @@ class UserBrokerImpl final : public UserBroker::Service {
             } else if(topKOption == 3) {
                 analyzeIntervalOpt(aes_key, aes_iv, ciperMp, queryK);
                 radius = binarySearchOpt(queryK);
-            }            
+            }           
+
+            for(int i = 0;i < radius.size();i++) {
+                std::cout << radius[i] << " ";
+            } 
+            std::cout << std::endl;
             ciperMp.clear();
             for(size_t i = 0;i < siloNum;i++) {
                 std::vector<unsigned char> plainText = FloatToUnsignedVector(radius[i]);
@@ -686,13 +689,11 @@ class UserBrokerImpl final : public UserBroker::Service {
                 for(size_t i = 0;i < siloNum;i++) {
                     SgxClearInfo(i);
                     std::vector<unsigned char> dat = StringToUnsignedVector(databack[i].data());
-                    SgxImportInfo(i, 2, dat.size(), aes_key[i].data(), aes_iv[i].data(), dat.data());
+                    SgxImportInfo(i, 2, dat.size(), queryK, aes_key[i].data(), aes_iv[i].data(), dat.data());
                 }
                 SgxCandRefinement(siloNum, queryK);
                 for(size_t i = 0;i < siloNum;i++) {
-                    unsigned char* CiperThres = NULL;
-                    SgxGetThres(i, 16, aes_key[i].data(), aes_iv[i].data(), CiperThres);
-                    std::vector<unsigned char> ciperText(CiperThres, CiperThres + 16);
+                    std::vector<unsigned char> ciperText = SgxGetThres(i, 16, aes_key[i].data(), aes_iv[i].data());
                     EncryptData data;
                     data.set_data(std::string(ciperText.begin(), ciperText.end()));
                     ciperMp[i] = data; 
@@ -744,7 +745,7 @@ class UserBrokerImpl final : public UserBroker::Service {
             for(size_t i = 0;i < siloNum;i++) {
                 SgxClearInfo(i);
                 std::vector<unsigned char> dat = StringToUnsignedVector(databack[i].data());
-                SgxImportInfo(i, 3, dat.size(), aes_key[i].data(), aes_iv[i].data(), dat.data());
+                SgxImportInfo(i, 3, dat.size(), queryK, aes_key[i].data(), aes_iv[i].data(), dat.data());
             }
             SgxTopkSelection(siloNum, queryK);
             for(size_t i = 0;i < siloNum;i++) {

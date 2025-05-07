@@ -5,7 +5,7 @@
 #include <limits>
 
 const int localSearchOption = 2; // 1:do not prune  2:build clusters and evaluate
-const int topKOption = 2; // 1:without candidates refinement 2:refine with binary search 3:refine with priority queue (our algorithm)
+const int topKOption = 3; // 1:without candidates refinement 2:refine with binary search 3:refine with priority queue (our algorithm)
 const bool recordAnswerComm = true;
 
 const float FLOAT_INF = 1e12;

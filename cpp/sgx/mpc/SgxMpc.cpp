@@ -279,12 +279,12 @@ void SgxOblivDequeue(int num) {
     ecall_OblivDequeueMore(global_eid, num);
 }
 
-void SgxImportInfo(size_t silo_id, int importType, size_t data_size,
+void SgxImportInfo(size_t silo_id, int importType, size_t data_size, size_t query_k,
                 const uint8_t *aes_key, const uint8_t* aes_iv,
                 const unsigned char* encrypt_data) {
     int result_status = 0xff;
 
-    sgx_status_t status = ecall_ImportInformation(global_eid, &result_status, silo_id, importType, data_size, aes_key, aes_iv, encrypt_data);
+    sgx_status_t status = ecall_ImportInformation(global_eid, &result_status, silo_id, importType, data_size, query_k, aes_key, aes_iv, encrypt_data);
     if (status != SGX_SUCCESS) {
 	    printf("ERROR: SGX IMPORT DATA FAIL, IMPORTTYPE = %d\n", importType);
 	    print_error_message(status);
@@ -300,33 +300,41 @@ void SgxJointEstimation(size_t silo_num, size_t k) {
    ecall_JointEstimation(global_eid, silo_num, k);
 }
 
-void SgxGetPrunedK(size_t silo_id, size_t max_output_size, 
-                   const uint8_t* aes_key, const uint8_t* aes_iv,
-                   unsigned char* encrypt_k) {
+std::vector<unsigned char> SgxGetPrunedK(size_t silo_id, size_t max_output_size, 
+                   const uint8_t* aes_key, const uint8_t* aes_iv) {
     int result_status = 0xff;
+    std::vector<unsigned char> result(max_output_size);
+
+    sgx_status_t status = ecall_GetPrunedK(global_eid, &result_status, silo_id, result.size(), aes_key, aes_iv, result.data());
     
-    sgx_status_t status = ecall_GetPrunedK(global_eid, &result_status, silo_id, max_output_size, aes_key, aes_iv, encrypt_k);
+    // for(int i = 0;i < max_output_size;i++) {
+    //     printf("%02x", result[i]);
+    // }
+    // printf("\n");
     if (status != SGX_SUCCESS) {
 	    printf("ERROR: SGX GET PRUNED K FROM %d FAIL", (int)silo_id);
 	    print_error_message(status);
 	    exit(-1);
     }
+    return result;
 }
 
 void SgxCandRefinement(size_t silo_num, size_t k) {
     ecall_CandRefinement(global_eid, silo_num, k);
 }
 
-void SgxGetThres(size_t silo_id, size_t max_output_size,
-                    const uint8_t* aes_key, const uint8_t* aes_iv,
-                    unsigned char* encrypt_thres) {
+std::vector<unsigned char> SgxGetThres(size_t silo_id, size_t max_output_size,
+                    const uint8_t* aes_key, const uint8_t* aes_iv) {
     int result_status = 0xff;
-    sgx_status_t status = ecall_GetThres(global_eid, &result_status, silo_id, max_output_size, aes_key, aes_iv, encrypt_thres);
+    std::vector<unsigned char> result(max_output_size);
+
+    sgx_status_t status = ecall_GetThres(global_eid, &result_status, silo_id, result.size(), aes_key, aes_iv, result.data());
     if (status != SGX_SUCCESS) {
 	    printf("ERROR: SGX GET THRESHOLD FROM %d FAIL", (int)silo_id);
 	    print_error_message(status);
 	    exit(-1);
     }
+    return result;
 }
 
 void SgxTopkSelection(size_t silo_num, size_t k) {
@@ -335,6 +343,6 @@ void SgxTopkSelection(size_t silo_num, size_t k) {
 
 int SgxGetK(size_t silo_id) {
     int ret = -100;
-    return ecall_GetK(global_eid, &ret, silo_id);
+    ecall_GetK(global_eid, &ret, silo_id);
     return ret;
 }

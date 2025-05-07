@@ -271,6 +271,19 @@ struct Array {
     struct QueueItem* a;
 };
 
+struct Interval {
+    float l, r;
+    size_t numL, numR;
+    int op;
+};
+
+struct IntervalArray {
+    int size;
+    int ptr;
+    int silo_id;
+    struct Interval* a;
+};
+
 static struct OblivQueue* obliv_queue = NULL;
 
 static struct Array* array[10] = {0};

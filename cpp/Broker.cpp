@@ -476,19 +476,6 @@ class UserBrokerImpl final : public UserBroker::Service {
             }
         }
 
-        std::vector<float> analyzeIntervalZero(std::map<size_t, std::vector<unsigned char>> &aes_key,
-            std::map<size_t, std::vector<unsigned char>> &aes_iv, const std::map<size_t, EncryptData> &kCiperTextMp, const int queryK) {
-            std::cout << "exactly send tuples" << std::endl;
-            databack.clear();
-            // m_logger.SetStartTimer();
-            parallelGetInterval(kCiperTextMp);
-            std::vector<float> ans(siloNum);
-            for(int i = 0;i < siloNum;i++) {
-                ans[i] = FLOAT_INF;
-            }
-            return ans;
-        }
-
         std::vector<float> binarySearchBase(int queryK) {
             float l = 0, r = 0;
             for(size_t i = 0;i < siloNum;i++) {
@@ -648,11 +635,9 @@ class UserBrokerImpl final : public UserBroker::Service {
             #ifdef USE_TRUSTED_BROKER
             std::vector<float> radius;
             if(topKOption == 1) {
-                radius = analyzeIntervalZero(aes_key, aes_iv, ciperMp, queryK);
-            } else if(topKOption == 2) {
                 analyzeIntervalBase(aes_key, aes_iv, ciperMp, queryK);
                 radius = binarySearchBase(queryK);
-            } else if(topKOption == 3) {
+            } else {
                 analyzeIntervalOpt(aes_key, aes_iv, ciperMp, queryK);
                 radius = binarySearchOpt(queryK);
             }           

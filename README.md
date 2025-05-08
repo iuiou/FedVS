@@ -187,7 +187,7 @@ In the third step, select ``NO`` and then input ``/opt/intel``.
 
 ### IV. Compile the source with Intel SGX (**Simulation Mode**)
 
-By replacing the line of ``cmake ......`` with the following line in ``bash/compile.sh``, you can enable the SGX-based PSI protocol:
+By replacing the line of ``cmake ......`` with the following line in ``scripts/build.sh``, you can enable the SGX-based PSI protocol:
 
 ```
 cmake -DUSE_SGX=ON ..
@@ -198,7 +198,7 @@ Now, you can re-compile and run the program.
 
 ### V. Compile the source with Intel SGX (**Hardware Mode**)
 
-By replacing the line of ``cmake ..`` with the following line in ``bash/compile.sh``, you can enable the SGX-based PSI protocol:
+By replacing the line of ``cmake ..`` with the following line in ``scripts/build.sh``, you can enable the SGX-based PSI protocol:
 
 ```
 cmake -DUSE_SGX=ON ..

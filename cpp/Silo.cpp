@@ -484,10 +484,7 @@ class BrokerSiloImpl final : public BrokerSilo::Service {
         minK = std::min(minK, newK); // ablation study for optimization #2
 
         int blockS = (int)std::ceil(std::sqrt(queryK));
-        if(topKOption == 1) { // without candidates refinement
-            plainText.clear();
-            plainText = Int32ToUnsignedVector(0);
-        } else if(topKOption == 2) { // refine with binary search
+        if(topKOption == 1) { // refine with binary search
             std::vector<std::pair<float, float>> border;
             int ptr = 0;
             while(ptr + blockS < candidates.size()) {
@@ -505,7 +502,7 @@ class BrokerSiloImpl final : public BrokerSilo::Service {
                 plainText.insert(plainText.end(), boundleft.begin(), boundleft.end());
                 plainText.insert(plainText.end(), boundright.begin(), boundright.end());
             }
-        } else if(topKOption == 3) { // refine with priority queue (our algorithm)
+        } else if(topKOption == 2) { // refine with priority queue (our algorithm)
             std::vector<float> border;
             int ptr = blockS - 1;
             while(ptr < candidates.size()) {

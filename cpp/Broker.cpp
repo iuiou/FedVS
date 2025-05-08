@@ -367,7 +367,7 @@ class UserBrokerImpl final : public UserBroker::Service {
             parallelExchangeKey();
         }
 
-        void analyizeContribution(std::map<size_t, std::vector<unsigned char>> &aes_key,
+        void analyzeContribution(std::map<size_t, std::vector<unsigned char>> &aes_key,
             std::map<size_t, std::vector<unsigned char>> &aes_iv, const VectorDataType &queryV,
             const size_t queryK, const std::string &condition, std::vector<size_t> &ans) {
             databack.clear();
@@ -413,7 +413,7 @@ class UserBrokerImpl final : public UserBroker::Service {
 
         void analyzeIntervalBase(std::map<size_t, std::vector<unsigned char>> &aes_key,
             std::map<size_t, std::vector<unsigned char>> &aes_iv, const std::map<size_t, EncryptData> &kCiperTextMp, const int queryK) {
-            std::cout << "analyize intervals with basic method" << std::endl;
+            std::cout << "analyze intervals with basic method" << std::endl;
             eachBucketSet.clear();
             databack.clear();
             // m_logger.SetStartTimer();
@@ -447,13 +447,12 @@ class UserBrokerImpl final : public UserBroker::Service {
                     }
                 }
             }
-            std::cout << std::endl;
             return;
         }
 
         void analyzeIntervalOpt(std::map<size_t, std::vector<unsigned char>> &aes_key,
             std::map<size_t, std::vector<unsigned char>> &aes_iv, const std::map<size_t, EncryptData> &kCiperTextMp, const int queryK) {
-            std::cout << "analyize intervals with priority queue" << std::endl;
+            std::cout << "analyze intervals with priority queue" << std::endl;
             optBucketSet.clear();
             databack.clear();
             parallelGetInterval(kCiperTextMp);
@@ -602,15 +601,15 @@ class UserBrokerImpl final : public UserBroker::Service {
 
             // Sec 3.4 : Contribution Pre-estimation 
             std::vector<size_t> kSet;
-            analyizeContribution(aes_key, aes_iv, queryV, queryK, condition, kSet);
+            analyzeContribution(aes_key, aes_iv, queryV, queryK, condition, kSet);
             std::map<size_t, EncryptData> ciperMp; 
 
 
             #ifdef USE_TRUSTED_BROKER
-            for(size_t i = 0;i < kSet.size();i++) {
-                std::cout << kSet[i] << " ";
-            }
-            std::cout << std::endl;
+            // for(size_t i = 0;i < kSet.size();i++) {
+            //     std::cout << kSet[i] << " ";
+            // }
+            // std::cout << std::endl;
             for(size_t i = 0;i < siloNum;i++) {
                 size_t prunedK = kSet[i];
                 std::vector<unsigned char> plainText = Int32ToUnsignedVector((int)prunedK);
@@ -642,10 +641,10 @@ class UserBrokerImpl final : public UserBroker::Service {
                 radius = binarySearchOpt(queryK);
             }           
 
-            for(int i = 0;i < radius.size();i++) {
-                std::cout << radius[i] << " ";
-            } 
-            std::cout << std::endl;
+            // for(int i = 0;i < radius.size();i++) {
+            //     std::cout << radius[i] << " ";
+            // } 
+            // std::cout << std::endl;
             ciperMp.clear();
             for(size_t i = 0;i < siloNum;i++) {
                 std::vector<unsigned char> plainText = FloatToUnsignedVector(radius[i]);
@@ -663,13 +662,11 @@ class UserBrokerImpl final : public UserBroker::Service {
             ciperMp.clear();
             if(topKOption == 1) {
                 for(size_t i = 0;i < siloNum;i++) {
-                    std::vector<unsigned char> plainText = FloatToUnsignedVector(FLOAT_INF);
-                    padding(plainText); // padding plainText to length % 16 == 0
-                    std::vector<unsigned char> ciperText = aes.EncryptCBC(plainText, aes_key[i], aes_iv[i]);
-                    EncryptData data;
-                    data.set_data(std::string(ciperText.begin(), ciperText.end()));
-                    ciperMp[i] = data; 
+                    SgxClearInfo(i);
+                    std::vector<unsigned char> dat = StringToUnsignedVector(databack[i].data());
+                    SgxImportInfo(i, 4, dat.size(), queryK, aes_key[i].data(), aes_iv[i].data(), dat.data());
                 }
+                SgxCandRefinementBase(siloNum, queryK);
             } else {
                 for(size_t i = 0;i < siloNum;i++) {
                     SgxClearInfo(i);
@@ -677,12 +674,12 @@ class UserBrokerImpl final : public UserBroker::Service {
                     SgxImportInfo(i, 2, dat.size(), queryK, aes_key[i].data(), aes_iv[i].data(), dat.data());
                 }
                 SgxCandRefinement(siloNum, queryK);
-                for(size_t i = 0;i < siloNum;i++) {
-                    std::vector<unsigned char> ciperText = SgxGetThres(i, 16, aes_key[i].data(), aes_iv[i].data());
-                    EncryptData data;
-                    data.set_data(std::string(ciperText.begin(), ciperText.end()));
-                    ciperMp[i] = data; 
-                }
+            }
+            for(size_t i = 0;i < siloNum;i++) {
+                std::vector<unsigned char> ciperText = SgxGetThres(i, 16, aes_key[i].data(), aes_iv[i].data());
+                EncryptData data;
+                data.set_data(std::string(ciperText.begin(), ciperText.end()));
+                ciperMp[i] = data; 
             }
             #endif
 

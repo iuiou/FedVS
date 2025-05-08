@@ -288,6 +288,8 @@ static struct OblivQueue* obliv_queue = NULL;
 
 static struct Array* array[10] = {0};
 
+static struct IntervalArray* intarray[10] = {0};
+
 static void compare_and_swap(struct QueueItem* a, struct QueueItem* b) {
 	float dista = a->dist;
 	float distb = b->dist;
@@ -478,6 +480,15 @@ static void ClearArray(struct Array*& arr) {
     arr = NULL;
 }
 
+static void ClearIntervalArray(struct IntervalArray*& arr) {
+    if(arr!=NULL && arr->a!=NULL) {
+        free(arr->a);
+    }
+    arr->a = NULL;
+    if(arr != NULL) free(arr);
+    arr = NULL;
+}
+
 static void OblivCreateQueue(struct OblivQueue*& q, int queue_size) {
     q = (struct OblivQueue*) malloc (sizeof(struct OblivQueue));
     q->a = (struct QueueItem*) malloc(queue_size * sizeof(struct QueueItem));
@@ -492,6 +503,13 @@ static void OblivInitQueue(struct OblivQueue* q, int queue_size) {
 
 static void m_InitArray(struct Array* set, int array_size, int silo_id) {
     set->a = (struct QueueItem*) malloc(array_size * sizeof(struct QueueItem));
+    set->ptr = 0;
+    set->silo_id = silo_id;
+    set->size = array_size;
+}
+
+static void m_InitIntervalArray(struct IntervalArray* set, int array_size, int silo_id) {
+    set->a = (struct Interval*) malloc(array_size * sizeof(struct Interval));
     set->ptr = 0;
     set->silo_id = silo_id;
     set->size = array_size;
@@ -592,6 +610,11 @@ static void InitArray(int silo_id, int size) {
     m_InitArray(array[silo_id], size, silo_id);    
 }
 
+static void InitIntervalArray(int silo_id, int size) {
+    intarray[silo_id] = (struct IntervalArray*) malloc (sizeof(struct IntervalArray));
+    m_InitIntervalArray(intarray[silo_id], size, silo_id);
+}
+
 void ecall_ClearInformation(size_t silo_id) {
     ClearArray(array[silo_id]);
 }
@@ -645,7 +668,7 @@ int ecall_ImportInformation(size_t silo_id, int importType, size_t data_size, si
             array[silo_id]->a[i].vid = (i == num - 1 ? k - bucketSize * i : bucketSize);
             array[silo_id]->a[i].silo_id = silo_id;
         }
-    } else { // phase II: secure top-k selection
+    } else if(importType == 3) { // phase II: secure top-k selection
         int batchSize = sizeof(float), offset = 0;
         int cnt = UnsignedVectorToInt32(plain_data, offset);
         InitArray(silo_id, cnt);
@@ -658,6 +681,62 @@ int ecall_ImportInformation(size_t silo_id, int importType, size_t data_size, si
             array[silo_id]->a[i].dist = dis;
             array[silo_id]->a[i].vid = 0;
             array[silo_id]->a[i].silo_id = silo_id;
+        }
+    } else if(importType == 4) {
+        ClearIntervalArray(intarray[silo_id]);
+        int batchSize = sizeof(float) * 2, offset = 0;
+        int k = UnsignedVectorToInt32(plain_data, offset);
+        int bucketSize = ceilSqrtK(query_k);
+        int num = (k + bucketSize - 1) / bucketSize;
+        if(num == 0) {
+            InitIntervalArray(silo_id, 0);
+        } else {
+            InitIntervalArray(silo_id, 2 * num + 1);
+        }
+        offset += 4;
+        int ptr = 0;
+        float inf = 1e12;
+        for(int i = 0; i < num; i++, offset += batchSize) {
+            float l = UnsignedVectorToFloat(plain_data, offset);
+            float r = UnsignedVectorToFloat(plain_data, offset + 4);
+            if(i == 0) {
+                intarray[silo_id]->a[ptr].l = -inf;
+                intarray[silo_id]->a[ptr].r = l;
+                intarray[silo_id]->a[ptr].numL = 0;
+                intarray[silo_id]->a[ptr].numR = 0;
+                intarray[silo_id]->a[ptr].op = 2;
+                ptr++;
+            } 
+            if (i == num - 1) {
+                intarray[silo_id]->a[ptr].l = l;
+                intarray[silo_id]->a[ptr].r = r;
+                intarray[silo_id]->a[ptr].numL = i * bucketSize + 1;
+                intarray[silo_id]->a[ptr].numR = k;
+                intarray[silo_id]->a[ptr].op = 1;
+                ptr++;
+
+                intarray[silo_id]->a[ptr].l = r;
+                intarray[silo_id]->a[ptr].r = inf;
+                intarray[silo_id]->a[ptr].numL = k;
+                intarray[silo_id]->a[ptr].numR = k;
+                intarray[silo_id]->a[ptr].op = 2;
+                ptr++;
+            } else {
+                intarray[silo_id]->a[ptr].l = l;
+                intarray[silo_id]->a[ptr].r = r;
+                intarray[silo_id]->a[ptr].numL = i * bucketSize + 1;
+                intarray[silo_id]->a[ptr].numR = (i + 1) * bucketSize;
+                intarray[silo_id]->a[ptr].op = 1;
+                ptr++;
+
+                float nextl = UnsignedVectorToFloat(plain_data, offset + 8);
+                intarray[silo_id]->a[ptr].l = r;
+                intarray[silo_id]->a[ptr].r = nextl;
+                intarray[silo_id]->a[ptr].numL = (i + 1) * bucketSize;
+                intarray[silo_id]->a[ptr].numR = (i + 1) * bucketSize;
+                intarray[silo_id]->a[ptr].op = 2;
+                ptr++;
+            }
         }
     }
     free(plain_data);
@@ -738,6 +817,80 @@ void ecall_CandRefinement(size_t silo_num, size_t k) {
     #endif
 
     OblivFreeQueue(obliv_queue);
+}
+
+void ecall_CandRefinementBase(size_t silo_num, size_t k) {
+    float l = 0, r = 0;
+    for(size_t i = 0;i < silo_num;i++) {
+        for(size_t j = 0;j < intarray[i]->size; j++) {
+            r = intarray[i]->a[j].l > r ? intarray[i]->a[j].l : r;
+        }
+    }
+    r += 1;
+    const float eps = 1e-3;
+    float radius = 0;
+    local_printf("[Before Binary Search]\n");
+    while(r - l > eps) {
+        float mid = (r + l) / 2;
+        size_t Rnum = 0;
+        radius = 0;
+        for(size_t i = 0;i < silo_num;i++) {
+            if(intarray[i]->size == 0) continue;
+            size_t L = 0, R = (size_t)intarray[i]->size - 1;
+            int ansPos = -1;
+            while(L <= R) {
+                size_t Mid = (L + R) / 2;
+                if((intarray[i]->a[Mid].op == 1 && (intarray[i]->a[Mid].l <= mid && mid <= intarray[i]->a[Mid].r)) ||
+                (intarray[i]->a[Mid].op == 2 && (intarray[i]->a[Mid].l < mid && mid < intarray[i]->a[Mid].r))) {
+                    ansPos = Mid;
+                    break;
+                } else if(intarray[i]->a[Mid].l > mid) {
+                    R = Mid - 1;
+                } else {
+                    L = Mid + 1;
+                }
+            }
+            if(ansPos != -1) {
+                Rnum += intarray[i]->a[ansPos].numR;
+                radius = radius < intarray[i]->a[ansPos].r ? intarray[i]->a[ansPos].r : radius;
+            }
+        }
+        if(Rnum >= k) {
+            r = mid;
+        } else {
+            l = mid;
+        }
+    }
+    local_printf("[After Binary Search]\n");
+    float inf = 1e12;
+    if(radius == inf) {
+        for(size_t i = 0;i < silo_num; i++) {
+            thres[i] = radius;
+        } 
+    } else {
+        for(size_t i = 0;i < silo_num;i++) {
+            if(intarray[i]->size == 0) {
+                thres[i] = 0;
+                continue;
+            }
+            size_t L = 0, R = (size_t)intarray[i]->size - 1;
+            int ansPos = -1;
+            while(L <= R) {
+                size_t Mid = (L + R) / 2;
+                if((intarray[i]->a[Mid].op == 1 && (intarray[i]->a[Mid].l <= radius && radius <= intarray[i]->a[Mid].r)) ||
+                (intarray[i]->a[Mid].op == 2 && (intarray[i]->a[Mid].l < radius && radius < intarray[i]->a[Mid].r))) {
+                    ansPos = Mid;
+                    break;
+                } else if((intarray[i]->a[Mid].op == 1 && intarray[i]->a[Mid].l > radius) ||
+                (intarray[i]->a[Mid].op == 2 && intarray[i]->a[Mid].l >= radius)) {
+                    R = Mid - 1;
+                } else {
+                    L = Mid + 1;
+                }
+            }
+            thres[i] = intarray[i]->a[ansPos].r;
+        }
+    }
 }
 
 int ecall_GetThres(size_t silo_id, size_t max_output_size,

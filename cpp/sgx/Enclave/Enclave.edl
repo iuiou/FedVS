@@ -50,6 +50,8 @@ enclave {
         /* phase I */
         public void ecall_CandRefinement(size_t silo_num, size_t k);
 
+        public void ecall_CandRefinementBase(size_t silo_num, size_t k);
+
         public int ecall_GetThres(size_t silo_id, size_t max_output_size,
                                  [in, count=16] const uint8_t* aes_key, [in, count=16] const uint8_t* aes_iv,
                                  [out, count=max_output_size] unsigned char* encrypt_thres);

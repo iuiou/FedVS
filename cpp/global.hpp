@@ -4,7 +4,7 @@
 #include <cmath>
 #include <limits>
 
-const int topKOption = 2; // 2:refine with binary search 3:refine with priority queue (with(out) optimization #1)
+const int topKOption = 2; // 1:refine with binary search 2:refine with priority queue (with(out) optimization #1)
 const int localSearchOption = 2; // 1:do not prune  2:build clusters and evaluate (with(out) optimization #2)
 const bool recordAnswerComm = true;
 

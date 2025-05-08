@@ -323,6 +323,10 @@ void SgxCandRefinement(size_t silo_num, size_t k) {
     ecall_CandRefinement(global_eid, silo_num, k);
 }
 
+void SgxCandRefinementBase(size_t silo_num, size_t k) {
+    ecall_CandRefinementBase(global_eid, silo_num, k);
+}
+
 std::vector<unsigned char> SgxGetThres(size_t silo_id, size_t max_output_size,
                     const uint8_t* aes_key, const uint8_t* aes_iv) {
     int result_status = 0xff;

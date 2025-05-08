@@ -1,37 +1,207 @@
-# MilvusSiloConnector使用方法
+# FedVS: Towards Federated Vector Similarity Search with Filters
 
-```C++
-siloPtr = std::make_unique<MilvusSiloConnector<Distance>>(siloId, ipAddr, collectionName); // collectionName 表示你当前使用的milvus对应的本地表名称
-siloPtr->ConnectDB("fzh", "fzh", "123", "localhost", "19530"); // 后两个ip 固定为localhost:19530不要改变
-siloPtr->LoadData(); // 表示将数据load入内存中，一定要执行这个指令再访问milvus
-siloPtr->KnnQuery(*queryV, k, ansV, ansD, condition); // 表示执行查询向量为queryV, 查询limit为k，查询谓词条件为condition的hybrid search，查询的向量结果存放在ansV中，距离结果存放在ansD中，保证向量与距离一一对应
-```
+**This repository aims to provide an implementation of our FedVS algorithm**
 
-# 编译依赖
+# Environment
 
-## GRPC
+OS: Ubuntu 20.04 LTS  
+GCC/G++: >= 8.4.0  
+CMake: >= 3.19.1  
+Docker: >=19.03  
+Docker Compose: >=1.29.2   
+[gRPC](https://grpc.io/): >= 1.66.0  
+[Milvus](https://milvus.io/): >= 2.5.2  
+[Boost C++ library](https://www.boost.org/): >= 1.85.0  
+RAM: >= 8GB
 
-需要按照[GRPC官网](https://grpc.org.cn/docs/languages/cpp/quickstart/)的教程在电脑上全局安装`GRPC`包，并加入环境变量（BDA服务器中自带）
+# Third Party Requirement and Installment
 
 ## Milvus
 
-~~前往[Milvus官方网站]([在 Docker 中运行 Milvus (Linux) | Milvus 文档](https://milvus.io/docs/zh/install_standalone-docker.md))下载`server`端的`docker-compose`文件，然后生成镜像与容器。注意需要启动所有容器才能运行起Milvus的Server端。~~（Done by Zhuanglin Zheng）
+**Milvus** is a blazing-fast open-source vector database designed to power AI-driven applications at scale and has been deployed into various industrial scenario. Built for vector similarity search on unstructured data, it enables machines to understand and retrieve contextually relevant information through neural network embeddings.
 
-## 其它第三方包
+Milvus is composed of a server which is integrated into a docker container, thus Milvus server should be firstly deployed.
 
-所有其它需要的第三方包位于`refs`文件夹中，如果需要使用`cmake`编译代码，务必将`refs`拷贝到构建工程的文件夹`build`（务必起名为`build`）当中。
-
-# 编译过程
-
-具体编译过程见脚本`scripts/build.sh`，具体构建指令如下：
+* **Download Milvus Docker Compose file**
 
 ```bash
-#!/bin/sh
-
-mkdir ../cpp/build
-cp -r ../refs ../cpp/build
-cd ../cpp/build/
-cmake ../
-make
+wget https://github.com/milvus-io/milvus/releases/download/v2.3.10/milvus-standalone-docker-compose.yml -O docker-compose.yml
 ```
 
+* **Start Milvus Services**
+
+```bash
+docker-compose up -d
+```
+
+* **Verify Installation**
+
+```bash
+docker-compose ps
+```
+
+Milvus offers comprehensive multi-language SDKs to facilitate vector operations. In our FedVS implementation, we leverage the [C++ SDK for Milvus](https://github.com/milvus-io/milvus-sdk-cpp) (hosted under the algorithms module). This SDK package features a well-structured design with:
+
+- Clean implementation of Milvus core functionalities
+- Intuitive CMake configurations
+- Cross-platform compatibility
+
+The modular architecture enables developers to seamlessly integrate vector search capabilities through straightforward API calls. For instance, the C++ binding abstracts complex operations while maintaining native performance, simplifying API interactions like collection management and vector similarity search.
+
+```
+FedVSE/
+│
+├── algorithms/
+    ├── cpp
+        ├── milvus
+        └── cmake
+        
+```
+
+## gRPC
+
+gRPC is a modern, open source, high-performance remote procedure call (RPC) framework that can run anywhere. gRPC enables client and server applications to communicate transparently, and simplifies the building of connected systems.
+
+Before compiling this project, you need to install the [gRPC](https://github.com/grpc/grpc) first by following the [guideline](https://grpc.io/docs/languages/cpp/quickstart/) as follows.
+
+* **Setup**
+
+Choose a directory to hold locally installed packages. This page assumes that the environment variable `MY_INSTALL_DIR` holds this directory path. For example:
+
+```bash
+export MY_INSTALL_DIR=$HOME/.local
+mkdir -p $MY_INSTALL_DIR
+```
+
+* **Install cmake**
+
+You need version 3.13 or later of cmake. Install it by following these instructions:
+
+```bash
+sudo apt install -y cmake
+```
+
+* **Install other required tools**
+
+Install the basic tools required to build gRPC:
+
+```bash
+sudo apt install -y build-essential autoconf libtool pkg-config
+```
+
+* **Clone the grpc repo**
+
+Clone the **grpc** repo and its submodules:
+
+```bash
+git clone --recurse-submodules -b v1.66.0 --depth 1 --shallow-submodules https://github.com/grpc/grpc
+```
+
+* **Build and install gRPC and Protocol Buffers**
+
+The following commands build and locally install **gRPC** and **Protocol Buffers**:
+
+```bash
+cd grpc
+mkdir -p cmake/build
+pushd cmake/build
+cmake -DgRPC_INSTALL=ON \
+      -DgRPC_BUILD_TESTS=OFF \
+      -DCMAKE_INSTALL_PREFIX=$MY_INSTALL_DIR \
+      ../..
+make -j 4
+make install
+popd
+```
+
+## Boost C++ Libraries
+
+Boost provides peer-reviewed and widely useful C++ libraries that work well with the Standard Library. Before compiling this project, you also need to install the [Boost](https://www.boost.org/) first by following the [guideline](https://www.boost.org/doc/libs/1_85_0/more/getting_started/unix-variants.html) as follows.
+
+* **Download the Boost**
+
+In Ubuntu, you can use the following commands to download Boost 1.85.0
+
+```bash
+wget https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.gz
+tar -xzvf /boost_1_85_0.tar.gz
+```
+
+* **Setup**
+
+Choose a directory to hold locally installed packages. This page assumes that the environment variable `MY_INSTALL_DIR` holds this directory path. For example:
+
+```bash
+export MY_INSTALL_DIR=$HOME/.local
+mkdir -p $MY_INSTALL_DIR
+```
+
+* **Build and install Boost**
+
+The following commands build and locally install **Boost**:
+
+```bash
+cd boost_1_85_0
+./bootstrap.sh --prefix=$MY_INSTALL_DIR
+./b2 install
+```
+
+## Intel SGX
+
+You also need to install the SDK and PSW for Intel SGX. The installation follows the guideline [Intel_SGX_SW_Installation_Guide_for_Linux.pdf](https://download.01.org/intel-sgx/latest/linux-latest/docs).
+
+### I. Install Dependency
+
+By executing the following commands, you can instal the dependencies first:
+
+```
+sudo apt-get install build-essential ocaml automake autoconf libtool wget python3 python-is-python3 libssl-dev dkms
+sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+```
+
+### II. Install Intel SGX SDK
+
+By executing the following commands, you can install Intel SGX SDK:
+
+```
+echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main' | sudo tee /etc/apt/sources.list.d/intel-sgx.list
+wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | sudo apt-key add
+sudo apt-get update
+sudo apt-get install libsgx-epid libsgx-quote-ex libsgx-dcap-ql
+sudo apt-get install libsgx-urts libsgx-launch libsgx-enclave-common
+sudo apt-get install libsgx-urts-dbgsym libsgx-enclave-common-dbgsym libsgx-dcap-ql-dbgsym libsgx-dcap-default-qpl-dbgsym
+```
+
+### III. Install Intel SGX PSW
+
+By executing the following commands, you can install Intel SGX PSW:
+
+```
+wget https://download.01.org/intel-sgx/latest/linux-latest/distro/ubuntu20.04-server/sgx_linux_x64_sdk_2.25.100.3.bin
+chmod +x sgx_linux_x64_sdk_2.25.100.3.bin
+./sgx_linux_x64_sdk_2.25.100.3.bin 
+sudo apt-get install libsgx-enclave-common-dev libsgx-dcap-ql-dev libsgx-dcap-default-qpl-dev tee-appraisal-tool
+```
+
+In the third step, select ``NO`` and then input ``/opt/intel``.
+
+### IV. Compile the source with Intel SGX (**Simulation Mode**)
+
+By replacing the line of ``cmake ......`` with the following line in ``bash/compile.sh``, you can enable the SGX-based PSI protocol:
+
+```
+cmake -DUSE_SGX=ON ..
+source /opt/intel/sgxsdk/environment
+```
+
+Now, you can re-compile and run the program.
+
+### V. Compile the source with Intel SGX (**Hardware Mode**)
+
+By replacing the line of ``cmake ..`` with the following line in ``bash/compile.sh``, you can enable the SGX-based PSI protocol:
+
+```
+cmake -DUSE_SGX=ON ..
+```
+
+Now, you can re-compile and run the program. Notice that, you need to ensure that your server supports the hardware of Intel SGX. Otherwise, you can only use the **simulation mode**.

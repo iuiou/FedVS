@@ -1,6 +1,6 @@
 # FedVS: Towards Federated Vector Similarity Search with Filters
 
-**This repository aims to provide an implementation of our FedVS algorithm**
+**This repository aims to provide an prototype system for secure and efficient federated vector similarity search with filters**
 
 # Environment
 
@@ -205,3 +205,115 @@ cmake -DUSE_SGX=ON ..
 ```
 
 Now, you can re-compile and run the program. Notice that, you need to ensure that your server supports the hardware of Intel SGX. Otherwise, you can only use the **simulation mode**.
+
+## Compile and run our algorithms
+
+### Compile the algorithms
+
+Execute the following commands to compile **data provider(Silo.cpp)** ,**central server(Broker.cpp)** and **query user(User.cpp)**:
+
+```bash
+cd scripts
+chmod +x *.sh
+./build.sh
+```
+
+### Enable the data silo of the algorithms
+
+Execute the following command in one terminal to enable a **data provider**:
+
+```bash
+./runSilo.sh
+```
+
+The detailed commands in the `runSilo.sh` is as follows:
+
+```bash
+#!/bin/bash
+
+ORIGINAL_DIR=$(pwd)
+cd ../cpp/build
+silo_id=0
+number=$((0*5 + ${silo_id}))
+data_path="/home/dataset/hybrid/YouTube-audio/YouTube_${number}.fivecs"
+scalardata_path="/home/dataset/hybrid/YouTube-audio/meta_${number}.txt"
+cluster_path="/home/dataset/hybrid/YouTube-audio/YouTube_${number}.cluster/cluster"
+collection_name="LOCAL_DATA_${number}"
+milvus_port="50055"
+cluster_option="OFF"
+milvus_option="OFF"
+alpha=0.05
+cluster_num=10
+ipaddr=localhost:50050
+ 
+./silo --ip=$ipaddr --id=$number --data-path=$data_path --scalardata-path=$scalardata_path --cluster-path=$cluster_path --index-type=HNSW --collection-name=$collection_name --milvus-port=$milvus_port --cluster-option=$cluster_option --milvus-option=$milvus_option --alpha=$alpha --cluster-num=$cluster_num
+
+cd "$ORIGINAL_DIR" 
+```
+
+### Enable the central server of the algorithms
+
+Central server side must be run on an server **equipped with Intel SGX**. Similar to the script for data silos, the query user can be enabled with the following command:
+
+```
+./runBroker.sh
+```
+
+The detailed commands in the `runBroker.sh` is as follows:
+
+```bash
+#!/bin/bash
+
+ORIGINAL_DIR=$(pwd)
+cd ../cpp/build
+
+if [ -f /opt/intel/sgxsdk/environment ]; then
+    source /opt/intel/sgxsdk/environment
+else
+    echo "Error: /opt/intel/sgxsdk/environment does not exist."
+    exit 1
+fi
+
+ipaddr="localhost:50056"
+ip_path="../../scripts/ip.txt"
+
+./broker --broker-ip=$ipaddr --silo-ip=$ip_path
+
+if [ $? -ne 0 ]; then  
+    echo "Data broker FAIL"  
+    exit 1  
+fi 
+
+cd "$ORIGINAL_DIR"
+```
+
+### Enable the query user of the algorithms
+
+The query user can be launched with the following command:
+
+```bash
+./run.sh
+```
+
+The detailed commands of query user is as follows:
+
+```bash
+#!/bin/bash
+
+ORIGINAL_DIR=$(pwd)
+cd ../cpp/build
+broker_ip="localhost:50056"
+ip_path="../../scripts/ip.txt"
+query_k=128
+query_path="/home/dataset/hybrid/YouTube-audio/query.txt"
+truth_path="/home/dataset/hybrid/YouTube-audio/gt_128_5.ivecs"
+output_path="output.txt"
+
+./user  --broker-ip=$broker_ip --silo-ip=$ip_path --query-k=$query_k --query-path=$query_path --output-path=$output_path --truth-path=$truth_path
+if [ $? -ne 0 ]; then  
+    echo "Query user FAIL"  
+    exit 1  
+fi 
+
+cd "$ORIGINAL_DIR"
+```

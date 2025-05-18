@@ -250,6 +250,18 @@ ipaddr=localhost:50050
 
 cd "$ORIGINAL_DIR" 
 ```
+> * ip: data provider's ip address
+> * id: data provider's ID
+> * data-path: file path of vector data
+> * scalardata-path: file path of attributes
+> * cluster-path: file path that stores clusters
+> * index-type: vector index's type
+> * collection-name: target collection name in Milvus
+> * milvus-port: running port of Milvus server
+> * cluster-option: whether to build cluster
+> * milvus-option: whether to insert vectors into Milvus
+> * alpha: hyper parameter $\alpha$
+> * cluster-num: hyper parameter number of clusters
 
 ### Enable the central server of the algorithms
 
@@ -287,6 +299,9 @@ fi
 cd "$ORIGINAL_DIR"
 ```
 
+> * broker-ip: ip address of central server
+> * silo-ip: ip address of each data provider
+
 ### Enable the query user of the algorithms
 
 The query user can be launched with the following command:
@@ -317,3 +332,10 @@ fi
 
 cd "$ORIGINAL_DIR"
 ```
+
+> * broker-ip: ip address of central server
+> * silo-ip: ip address of each data provider
+> * query-k: query parameter $k$
+> * query-path: file path of query vectors and attribute filter
+> * output-path: file path that stores output
+> * truth-path: file path that stores ground truth of queries

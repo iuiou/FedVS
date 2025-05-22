@@ -1,5 +1,7 @@
 # FedVS: Towards Federated Vector Similarity Search with Filters
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 **This repository aims to provide an prototype system for secure and efficient federated vector similarity search with filters**
 
 # Environment

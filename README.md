@@ -339,3 +339,7 @@ cd "$ORIGINAL_DIR"
 > * query-path: file path of query vectors and attribute filter
 > * output-path: file path that stores output
 > * truth-path: file path that stores ground truth of queries
+
+# License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
